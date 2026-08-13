@@ -6,12 +6,19 @@ import type {
   LinearCollectionResult,
   LinearIssue
 } from '../types'
-import { isClipboardTextByteLengthOverLimit } from '../clipboard-text'
 import { JIRA_ISSUE_KEY_PATTERN, parseJiraIssueUrl } from '../jira-issue-url'
+import {
+  isSmartWorkspaceLinearIssueIntentMatch,
+  parseBoundedSmartWorkspaceLinearIssueUrlIntent
+} from './smart-workspace-linear-intent'
+import { isSmartWorkspaceSourceQueryWithinLimit } from './smart-workspace-source-query'
+
+export {
+  SMART_WORKSPACE_SOURCE_QUERY_MAX_BYTES,
+  isSmartWorkspaceSourceQueryWithinLimit
+} from './smart-workspace-source-query'
 
 export type SmartNameMode = 'smart' | 'github' | 'gitlab' | 'branches' | 'linear' | 'jira' | 'text'
-
-export const SMART_WORKSPACE_SOURCE_QUERY_MAX_BYTES = 2048
 
 export type SmartWorkspaceSourceRow =
   | { kind: 'use-name'; value: string; name: string }
@@ -36,13 +43,6 @@ const EMPTY_HINT_BY_MODE: Record<SmartNameMode, string> = {
 
 export function getSmartWorkspaceEmptyHint(mode: SmartNameMode): string {
   return EMPTY_HINT_BY_MODE[mode]
-}
-
-export function isSmartWorkspaceSourceQueryWithinLimit(
-  query: string,
-  maxBytes = SMART_WORKSPACE_SOURCE_QUERY_MAX_BYTES
-): boolean {
-  return !isClipboardTextByteLengthOverLimit(query, maxBytes)
 }
 
 export function buildJiraIssueSearchJql(query: string): string | null {
@@ -221,6 +221,22 @@ export function buildSmartWorkspaceSourceRows({
   }
   const trimmed = value.trim()
   const nextRows: SmartWorkspaceSourceRow[] = []
+  const resolvedLinearIssues = Array.isArray(linearIssues)
+    ? linearIssues
+    : Array.isArray(linearIssues?.items)
+      ? linearIssues.items
+      : []
+  const linearUrlIntent = parseBoundedSmartWorkspaceLinearIssueUrlIntent(trimmed)
+  if (linearAvailable && linearUrlIntent && (mode === 'smart' || mode === 'linear')) {
+    return resolvedLinearIssues
+      .filter((issue) => isSmartWorkspaceLinearIssueIntentMatch(linearUrlIntent, issue))
+      .map((issue) => ({
+        kind: 'linear' as const,
+        value: `linear-${issue.id}`,
+        issue
+      }))
+      .slice(0, resultLimit)
+  }
   if (trimmed && mode === 'smart') {
     // Why: stable cmdk value — embedding the query remounted the row every keystroke.
     nextRows.push({ kind: 'use-name', value: 'use-name', name: trimmed })
@@ -266,11 +282,6 @@ export function buildSmartWorkspaceSourceRows({
   if (linearAvailable && (mode === 'smart' || mode === 'linear')) {
     // Why: mixed-version runtime responses may briefly carry the paginated
     // collection shape into this render path; rendering must stay recoverable.
-    const resolvedLinearIssues = Array.isArray(linearIssues)
-      ? linearIssues
-      : Array.isArray(linearIssues?.items)
-        ? linearIssues.items
-        : []
     nextRows.push(
       ...resolvedLinearIssues.map((issue) => ({
         kind: 'linear' as const,

@@ -115,6 +115,12 @@
       "port": "Port",
       "pr": "PR"
     },
+    "linearIssue": {
+      "createLabel": "Create worktree from Linear issue {{value0}}: {{value1}}",
+      "loadingLabel": "Loading Linear issue {{value0}}",
+      "createHint": "Create worktree from Linear issue",
+      "loadingHint": "Loading Linear issue…"
+    },
     "renderCapOverflow": "{{value0}} more — scroll or keep typing to narrow",
     "filter": {
       "emptyTitle": "No results match the active filter",
